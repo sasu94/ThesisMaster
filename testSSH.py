@@ -1,17 +1,23 @@
 import paramiko
 import time
 import re
+import json
+import pyshark
+
 toVisit=[]
 visited=[]
 elems={}
 
 class Element:
-    def __init__(self,type,name):
-        self.type=type
-        self.name=name
-        self.links=[]
-    def addLink(self,link):
-        self.links.append(link)
+	def __init__(self,type,name,platform):
+		self.type=type
+		self.name=name
+		self.platform=platform
+		self.links=[]
+	def addLink(self,link):
+		self.links.append(link)
+	def toJSON(self):
+		return json.dumps(self,default=lambda o:o.__dict__)
 
 class Link:
     def __init__(self,port1,port2,element):
@@ -45,21 +51,30 @@ def connectionSSH(ip, user, password):
 
 
 def parse(text,curr):
-	print(curr.type)
+	print(text)
+
 	s=text.split("\n")
 	name=re.search('Device ID: (.*)',s[1]).group(1)
-	ip=re.search('.*: (.*)',s[3]).group(1).strip()
+	ip=re.search('.*IP address: (.*)',s[3]).group(1).strip()
 	ports=s[5].split(',')
 	fr=re.search('.*: (.*)',ports[0]).group(1)
 	to=re.search('.*: (.*)',ports[1]).group(1)
+	info=s[4].split(',')
+	plat=re.search('.*Platform: (.*)',info[0]).group(1)
+	capa=re.search('.*Capabilities: (.*)',info[1]).group(1).strip()
 	print(name)
 	print(ip)
 	print(fr)
 	print(to)
+	print(plat)
+	print(capa)
 	print('--------------')
 	print(ip)
-	for x in visited:
-		print("\t"+x)
+	
+	element=Element(name,capa,plat)
+	elems[ip]=element
+	curr.addLink(Link(fr,to,element))
+	
 	if(ip not in visited and ip not in toVisit):
 		toVisit.append(ip)
 
@@ -77,9 +92,18 @@ def visit():
 				parse(text,curr)
 		visited.append(ip)
 
+def sniff():
+	cap=pyshark.LiveCapture('eth0',display_filter='cdp')
+	packet=cap.sniff_continuously(packet_count=1)
+	print(packet[0])
+	print("\n\n")
+	cap.close()
+
 def main():
 	toVisit.append("10.0.2.5")
-	visit()
-root=Element("Switch","10.0.2.5")
+	#visit()
+	sniff()
+
+root=Element("Switch","10.0.2.5","cacca")
 elems["10.0.2.5"]=root
 main()
