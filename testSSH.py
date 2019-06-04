@@ -93,22 +93,35 @@ def visit():
 				parse(text,curr)
 		visited.append(ip)
 
-def sniff():
+def sniff(timeout):
 	print("start sniffing\n")
 	cap=pyshark.LiveCapture('ens3',display_filter='cdp')
-	pack=cap.sniff(packet_count=1,timeout=10)
-	print(pack)
-	print("\n\n")
+	cap.sniff(packet_count=1,timeout=timeout)
+	if cap:
+		pack=cap[0]
+		id=pack.cdp.deviceid
+		ip=pack.cdp.nrgyz_ip_address
+		capa=pack.cdp.capabilities
+		root=Element(id,ip,capa)
+		toVisit.append(ip)
+		visit()
+	else:
+		print("time expired")
 	cap.close()
 
-def main():
-	toVisit.append("10.0.2.5")
-	if sys.argv[1]=="-a":
-		sniff()
-	else:
+if len(sys.argv)>1:
+	if sys.argv[1]=="-a" and len(sys.argv)==3:
+		sniff(int(sys.argv[2]))
+	elif sys.argv[1]=="-a":
+		sniff(180)
+	elif sys.argv[1]=="-m" and len(sys.argv)==3:
+		root=Element("Unknown","10.0.2.5","unknown")
+		elems["10.0.2.5"]=root
+		#toVisit.append("10.0.2.5")
+		toVisit.append(sys.argv[2])
 		visit()
+else:
+	print("usage: asdasd")
 
-root=Element("Switch","10.0.2.5","cacca")
-elems["10.0.2.5"]=root
 
-main()
+
