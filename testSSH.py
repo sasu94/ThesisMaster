@@ -3,6 +3,7 @@ import time
 import re
 import json
 import pyshark
+import sys
 
 toVisit=[]
 visited=[]
@@ -93,17 +94,21 @@ def visit():
 		visited.append(ip)
 
 def sniff():
-	cap=pyshark.LiveCapture('eth0',display_filter='cdp')
-	packet=cap.sniff_continuously(packet_count=1)
-	print(packet[0])
+	print("start sniffing\n")
+	cap=pyshark.LiveCapture('ens3',display_filter='cdp')
+	pack=cap.sniff(packet_count=1,timeout=10)
+	print(pack)
 	print("\n\n")
 	cap.close()
 
 def main():
 	toVisit.append("10.0.2.5")
-	#visit()
-	sniff()
+	if sys.argv[1]=="-a":
+		sniff()
+	else:
+		visit()
 
 root=Element("Switch","10.0.2.5","cacca")
 elems["10.0.2.5"]=root
+
 main()
