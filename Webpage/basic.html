@@ -1,0 +1,50 @@
+<html>
+<head>
+<style type="text/css">
+    #container {
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      position: absolute;
+    }
+
+</style>
+</head>
+<body>
+<div id="container"></div>
+<script src="../src/sigma.min.js"></script>
+<script src="../src/plugins/sigma.parsers.json.min.js"></script>
+<script src="../src/plugins/sigma.plugins.dragNodes.min.js"></script>
+<script src="../src/plugins/sigma.renderers.edgeLabels.min.js"></script>
+<script>
+  
+  
+  s=sigma.parsers.json('data.json', {
+    renderer: {              
+        container: 'container',
+        type: 'canvas'
+    },
+    settings: {
+      defaultNodeColor: '#ec5148',
+      edgeLabelSize: 'proportional'
+    } },
+    function(s) {
+      
+      s.graph.nodes().forEach(function(node, i, a) {
+      node.x = Math.cos(Math.PI * 2 * i / a.length);
+      node.y = Math.sin(Math.PI * 2 * i / a.length);
+      });
+      var dragListener = sigma.plugins.dragNodes(s, s.renderers[0]);
+            
+      
+      s.refresh();
+      
+      
+      
+  });
+
+  
+</script>
+</body>
+</html>
