@@ -4,10 +4,14 @@ import re
 import json
 import pyshark
 import sys
+import json
+import os
+from cryptography.fernet import Fernet
 
 toVisit=[]
 visited=[]
 elems={}
+db={}
 
 class Element:
     def __init__(self,type,name,platform,ip):
@@ -15,7 +19,10 @@ class Element:
         self.name=name
         self.platform=platform
         self.ip=ip
+        self.mac=''
         self.links=[]
+    def addMac(self,mac):
+        self.mac=mac
     def addLink(self,link):
         self.links.append(link)
     def toJSON(self):
@@ -26,17 +33,40 @@ class Link:
         self.port1=port1
         self.port2=port2
         self.element=element
+        
+        
+def decryptdb():    
+    key=os.environ.get('KEY')
+    fernet = Fernet(key)
 
+
+    with open('hosts.db', 'rb') as f:
+        data = f.read()
+
+    db=json.loads(data.decode())
+
+
+    for ip in db:
+        password=db[ip]['pass']
+        enable=db[ip]['en']
+        
+        db[ip]['pass']=fernet.decrypt(password.encode()).decode()
+        db[ip]['en']=fernet.decrypt(enable.encode()).decode()
+        
+    return db
 def connectionSSH(ip, user, password):
     list=[]
     try:
+            
         client=paramiko.SSHClient()
+        if ip not in db:
+           return
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname=ip,username=user,password=password)
+        client.connect(hostname=ip,username=db[ip]['user'],password=db[ip]['pass'])
 
         sh=client.invoke_shell()
         sh.send("en\n")
-        sh.send("ciao\n")
+        sh.send(db[ip]['en']+"\n")
         sh.send("terminal length 0\n")
         sh.send("show lldp neighbors detail\n")
         sh.send("\n")
@@ -57,19 +87,31 @@ def connectionSSH(ip, user, password):
                     # code won't stuck here
                     buff+=resp
         
+        cdp=re.compile('--+').split(buff)[1:]
+        
+        
+        buff=''
+        sh.send("show ip arp\n")
+        sh.send("\n");
+        
+        while not re.search('.*#\r\n.*#.*',buff):
+            if sh.recv_ready():
+                resp = sh.recv(9999).decode('ascii')    
+                # code won't stuck here
+                buff+=resp
+    
         
         sh.send("exit\r\n")
         
-
-        list=re.compile('--+').split(buff)
-
+        arp=buff.split("\n")
+        list=(cdp,arp[2:(len(arp)-2)])
         
     finally:
         client.close()
         return(list)
 
 
-def parse(text,curr):
+def parseCDP(text,curr):
     #print(text)
 
     s=text.split("\n")
@@ -107,13 +149,19 @@ def parse(text,curr):
     
     if(ip not in visited and ip not in toVisit):
         toVisit.append(ip)
+        
+        
+def parseArp(text,curr):
 
-def constructJSON(root):
-    if(root.links):
-        for el in root.links:
-            constructJSON() 
-    else:
-        print(el.name)
+    text=re.compile('\s\s+').split(text)
+    ip=text[1]
+    mac=text[3]
+    
+    if ip in elems:
+        print(ip+" "+elems[ip].ip+" "+mac)
+        
+        elems[ip].addMac(mac)
+        
 
 def visit():
     while(toVisit):
@@ -124,35 +172,43 @@ def visit():
             print("unable to connect in ssh\n")
         else:
             curr=elems[ip]
-            list=list[1:]
-            for text in list:
-                parse(text,curr)
-            print('AAAAAAAA: '+ip+' '+str(len(curr.links)))
+            for text in list[0]:
+                parseCDP(text,curr)
+            for text in list[1]:
+                print(text)
+                parseArp(text,curr)
+            print('links found for '+ip+': '+str(len(curr.links)))
         visited.append(ip)
         
 def constructJSON():
     
     first=True
     firstE=True
-    nodes='{"nodes":['
-    edges='"edges":['
+    nodes='{"nodes":\n\t['
+    edges='"edges":\n\t['
     cont=0
-    for ip in elems:
+    computed=[]
+    
+    
+    
+    for ip in sorted(elems.keys()):
         if first:
-            nodes+='{"id":"'+ip+'", "label":"'+elems[ip].name+'","x":0,"y":0,"size":1}'
+            nodes+='{"id":"'+ip+'", "label":"'+elems[ip].name+'","x":0,"y":0,"size":1,"mac":"'+elems[ip].mac+'"}'
             first=False
         else:
-            nodes+=',{"id":"'+ip+'", "label":"'+elems[ip].name+'","x":0,"y":1,"size":1}'
-        print(len(elems[ip].links))
+            nodes+=',\n\t{"id":"'+ip+'", "label":"'+elems[ip].name+'","x":0,"y":1,"size":1,"mac":"'+elems[ip].mac+'"}'
         for edge in elems[ip].links:
-            if firstE:
-                edges+='{"id":'+ str(cont) +', "label":"from '+edge.port1+' to '+edge.port2+'","source":"'+ip+'", "target": "'+edge.element.ip+'"}'
-                firstE=False
-            else:
-                edges+=',{"id":'+ str(cont) +', "source":"'+ip+'", "target": "'+edge.element.ip+'","label":"from '+edge.port1+' to '+edge.port2+'"}'
-            cont+=1
-    nodes+='],'
-    edges+=']}'
+            if((edge.port1,edge.port2) not in computed and (edge.port2, edge.port1) not in computed):
+                if firstE:
+                    edges+='{"id":'+ str(cont) +', "source":"'+ip+'", "target": "'+edge.element.ip+'","from":"'+edge.port1+'", "to":"'+edge.port2+'"}'
+                    firstE=False
+                    computed.append((edge.port1, edge.port2))
+                else:
+                    edges+=',\n\t{"id":'+ str(cont) +', "source":"'+ip+'", "target": "'+edge.element.ip+'","from":"'+edge.port1+'", "to":"'+edge.port2+'"}'
+                    computed.append((edge.port1, edge.port2))
+                cont+=1
+    nodes+=']\n,'
+    edges+=']\n}'
     
     
     s=nodes+edges
@@ -172,6 +228,7 @@ def sniff(timeout):
             root=Element(capa,id,platform,ip)
             elems[ip]=root
             toVisit.append(ip)
+            db=decryptdb()
             visit()
             #print(constructJSON(root))
         else:
@@ -190,6 +247,7 @@ if len(sys.argv)>1:
         root=Element("Unknown","Unknown","unknown",ip)
         elems[ip]=root
         toVisit.append(ip)
+        db=decryptdb()
         visit()
         #constructJSON(root)
     else:
