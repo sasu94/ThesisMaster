@@ -1,6 +1,7 @@
 <!DOCTYPE>
 <html>
 <head>
+  <meta charset="utf-8"/>
   <title>
     Topology
   </title>
@@ -11,6 +12,7 @@
       left: 0;
       right: 0;
       position: absolute;
+      z-index:-1;
     }
 
 </style>
@@ -18,13 +20,48 @@
 </head>
 <body>
 <div id="container"></div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@8"></script>
 <script src="../src/sigma.min.js"></script>
 <script src="../src/plugins/sigma.parsers.json.min.js"></script>
 <script src="../src/plugins/sigma.plugins.dragNodes.min.js"></script>
 <script src="../src/plugins/sigma.renderers.edgeLabels.min.js"></script>
 <script>
+  $(document).ready(function(){
+    var old=myItems["items"].filter(function(e){
+      return e.new=="false";
+    })
+    
+    
+    if(old.length==0)
+      $('#oldElements').hide();   
   
+    $('#oldElements').bind('click',function(e){
+      var table=$('<table class="table">');
+      
+      var thead=$('<thead>');
+      
+      thead.append('<tr><th scope="col">Name</th><th scope="col">Ip</th><th scope="col">Mac</th></tr>');
+      table.append(thead);
+      var tbody=$('<tbody>')
+      
+      old.forEach(function(e){
+           tbody.append('<tr><td>'+e.label+'</td><td>'+e.id+'</td><td>'+e.mac+'</td></tr>');
+      });
+      
+      table.append(tbody);
+      
+      Swal.fire({
+        html: table,
+        title: 'Elements not found in new scan',
+        confirmButtonText: 'OK',
+        width: '60%'
+      });
+    });
+  
+  });
+  var myItems;
   
   var s=sigma.parsers.json('data.json', {
     renderer: {              
@@ -35,7 +72,21 @@
       defaultNodeColor: '#ec5148',
       edgeLabelSize: 'proportional'
     } },
-    function(s) {
+    function(s) {      
+      
+       //var myItems;
+
+      $.ajax({
+        url: "diff.json",
+        async: false,
+        cache: false,
+        dataType: "text",
+        success: function( data, textStatus, jqXHR ) {
+          myItems=JSON.parse(data);
+        }
+      });
+      
+      
       
       
       function click(e){
@@ -82,7 +133,14 @@
       
       
       s.bind('clickNode',click);
+      
       s.graph.nodes().forEach(function(node, i, a) {
+        
+        myItems["items"].forEach(function(e){
+          if(node.id==e.id && e.new=="true"){
+            node.color="#0F0"
+          }
+        });
         node.x = Math.cos(Math.PI * 2 * i / a.length);
         node.y = Math.sin(Math.PI * 2 * i / a.length);
       });
@@ -100,12 +158,11 @@
         },250)
       });
       
-      s.refresh();
-            
+      s.refresh();            
   });
   
-  console.log(s);
   
 </script>
+<div class="float-right m-3"><input id="oldElements" class="btn btn-primary" type="button" value="Elements not found on new scan"></div>
 </body>
 </html>

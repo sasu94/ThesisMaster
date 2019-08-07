@@ -6,6 +6,7 @@ import pyshark
 import sys
 import json
 import os
+import difflib
 from cryptography.fernet import Fernet
 
 toVisit=[]
@@ -158,7 +159,7 @@ def parseArp(text,curr):
     mac=text[3]
     
     if ip in elems:
-        print(ip+" "+elems[ip].ip+" "+mac)
+       # print(ip+" "+elems[ip].ip+" "+mac)
         
         elems[ip].addMac(mac)
         
@@ -175,7 +176,6 @@ def visit():
             for text in list[0]:
                 parseCDP(text,curr)
             for text in list[1]:
-                print(text)
                 parseArp(text,curr)
             print('links found for '+ip+': '+str(len(curr.links)))
         visited.append(ip)
@@ -255,7 +255,27 @@ if len(sys.argv)>1:
 else:
     print("usage: nas.py -a [timeout] for automatic sniff of cdp packet (180s default)\ntestSSH.py -m ip for manual search")
 
-file = open('Webpage/data.json','w')
+newFile=constructJSON()
+nF=newFile
+nF=nF.split('\n')
+#element=nF[3][:7]+'"2'+nF[3][9:]
+#element2=nF[4][:7]+'"2'+nF[4][9:]
+#nF.insert(2,element)
+#nF.insert(4,element2)
+with open('Webpage/data.json') as f2:
+    oldFile=f2.read()
+    
+newElements=[]
+for line in list(difflib.unified_diff(oldFile.split('\n'), nF, fromfile='oldFile', tofile='newFile',lineterm="\n"))[2:]:
+    if line[0]=='+':
+        newElements.append(line[1:len(line)-2]+', "new":"true"}')
+    if line[0]=='-':
+        newElements.append(line[1:len(line)-2]+', "new":"false"}')
 
-file.write(constructJSON())
-file.close()
+diffFile='{"items":['+",\n".join(newElements)+']}'
+
+with open('Webpage/diff.json','w+') as d:
+    d.write(diffFile)
+    
+with open('Webpage/data.json','w') as file:
+    file.write("\n".join(nF))
