@@ -1,6 +1,8 @@
 {"nodes":
 	[{"id":"10.0.0.1", "label":"R-1","x":0,"y":0,"size":1,"mac":"ca01.2d7a.0006"},
+	{"id":"20.0.0.3", "label":"Switch1.switch","x":0,"y":1,"size":1,"mac":"0cd5.c384.8001"},
 	{"id":"10.0.0.3", "label":"Switch1.switch","x":0,"y":1,"size":1,"mac":"0cd5.c384.8001"},
+	{"id":"20.0.0.4", "label":"Switch2.switch","x":0,"y":1,"size":1,"mac":"0cd5.c36f.8001"},
 	{"id":"10.0.0.4", "label":"Switch2.switch","x":0,"y":1,"size":1,"mac":"0cd5.c36f.8001"},
 	{"id":"10.0.0.5", "label":"Switch3.switch","x":0,"y":1,"size":1,"mac":"0cd5.c30f.8001"}]
 ,"edges":

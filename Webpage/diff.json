@@ -1,1 +1,2 @@
-{"items":[]}
+{"items":[	{"id":"20.0.0.3", "label":"Switch1.switch","x":0,"y":1,"size":1,"mac":"0cd5.c384.8001", "new":"true"},
+	{"id":"20.0.0.4", "label":"Switch2.switch","x":0,"y":1,"size":1,"mac":"0cd5.c36f.8001", "new":"true"}]}

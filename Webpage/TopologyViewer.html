@@ -7,21 +7,67 @@
   </title>
 <style type="text/css">
     #container {
-      top: 0;
-      bottom: 0;
+      top: 10%;
+      bottom: 5%;
       left: 0;
       right: 0;
       position: absolute;
       z-index:-1;
     }
+    
+    
+   .btn-circle {
+      width: 45px;
+      height: 45px;
+      line-height: 45px;
+      text-align: center;
+      padding: 0;
+      border-radius: 50% !important;
+    }
+
+    .btn-circle i {
+      position: relative;
+      top: -1px;
+    } 
 
 </style>
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<script src="https://kit.fontawesome.com/3c7437fa0b.js"></script>
 </head>
 <body>
+
+<nav class="navbar navbar-light bg-light">
+  <span class="navbar-brand mb-0 h1">Topology</span>
+</nav>
 <div id="container"></div>
 
+
+<div class="row">
+  <div class="col-lg-12">
+    <input id="oldElements" class="btn btn-primary float-right m-2" type="button" value="Elements not found on new scan" style="display:none"/>  
+  </div>
+  <div class="col-lg-12 ">
+    <button type="button" id='plus' class="btn btn-primary btn-circle float-right m-2">
+      <i class="fas fa-plus"></i>
+    </button>
+  </div>
+  <div class="col-lg-12">
+    <button type="button" id='minus' class="btn btn-primary btn-circle float-right m-2">
+      <i class="fas fa-minus"></i>
+    </button>
+  </div>
+  <div class="col-lg-12">
+    <button type="button" id='center' class="btn btn-primary btn-circle float-right m-2">
+      <i class="fas fa-expand"></i>
+    </button>
+  </div>
+</div>
+
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@8"></script>
 <script src="../src/sigma.min.js"></script>
 <script src="../src/plugins/sigma.parsers.json.min.js"></script>
@@ -34,8 +80,8 @@
     })
     
     
-    if(old.length==0)
-      $('#oldElements').hide();   
+    if(old.length!=0)
+      $('#oldElements').show();   
   
     $('#oldElements').bind('click',function(e){
       var table=$('<table class="table">');
@@ -70,7 +116,8 @@
     },
     settings: {
       defaultNodeColor: '#ec5148',
-      edgeLabelSize: 'proportional'
+      edgeLabelSize: 'proportional',
+      doubleClickEnabled: false
     } },
     function(s) {      
       
@@ -102,26 +149,29 @@
         });
         
         
-        var res='IP='+e.data.node.id+'<br>MAC='+e.data.node.mac+'<br><br><table class="table"><thead><tr><th scope="col">Name</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">From</th><th scope="col">To</th></tr></thead><tbody>';
-        
-        l.forEach(function(f){
-          res+='<tr>';
-          if(f.isSource){
-            var target=s.graph.nodes().filter(function(node){
-                return node.id==f.target;
-            });
-            res+='<td>'+target[0].label+'</td><td>'+f.target+'</td><td>'+target[0].mac+'</td>';
-          }else{
-            var source=s.graph.nodes().filter(function(node){
-                return node.id==f.source;
-            });
-            
-            res+='<td>'+source[0].label+'</td><td>'+f.source+'</td><td>'+source[0].mac+'</td>';
-          }
-          res+='<td>'+f.from+'</td><td>'+f.to+'</td></tr>';     
-        })
+        var res='IP='+e.data.node.id+'<br>MAC='+e.data.node.mac;
+        if(l.length>0){
+          res+='<br><br><table class="table"><thead><tr><th scope="col">Name</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">From</th><th scope="col">To</th></tr></thead><tbody>';
           
-        res+='</tbody></table>'
+          l.forEach(function(f){
+            res+='<tr>';
+            if(f.isSource){
+              var target=s.graph.nodes().filter(function(node){
+                  return node.id==f.target;
+              });
+              res+='<td>'+target[0].label+'</td><td>'+f.target+'</td><td>'+target[0].mac+'</td>';
+            }else{
+              var source=s.graph.nodes().filter(function(node){
+                  return node.id==f.source;
+              });
+              
+              res+='<td>'+source[0].label+'</td><td>'+f.source+'</td><td>'+source[0].mac+'</td>';
+            }
+            res+='<td>'+f.to+'</td><td>'+f.from+'</td></tr>';     
+          })
+            
+          res+='</tbody></table>';
+        }
         Swal.fire({
           html: res,
           title: 'links detail for '+e.data.node.label,
@@ -158,11 +208,41 @@
         },250)
       });
       
+      var c = s.camera;
+      var originalRatio=c.ratio;
+      $('#plus').on('click',function(){
+        
+
+         sigma.misc.animation.camera(c, {
+          ratio: c.ratio / c.settings('zoomingRatio')
+        }, {
+          duration: 200
+        });
+      });
+      
+      $('#minus').on('click',function(){
+        sigma.misc.animation.camera(c, {
+          ratio: c.ratio * c.settings('zoomingRatio')
+        }, {
+          duration: 200
+        });
+      });
+      
+      $('#center').on('click',function(){
+        sigma.misc.animation.camera(c, {
+          ratio: originalRatio,
+          x:0,
+          y:0
+        }, {
+          duration: 200
+        });
+      });
+    
+      
       s.refresh();            
   });
   
   
 </script>
-<div class="float-right m-3"><input id="oldElements" class="btn btn-primary" type="button" value="Elements not found on new scan"></div>
 </body>
 </html>
