@@ -6,15 +6,18 @@
     Topology
   </title>
 <style type="text/css">
-    #container {
+    #graph {
       top: 10%;
       bottom: 5%;
       left: 0;
       right: 0;
       position: absolute;
-      z-index:-1;
+      z-index:0;
     }
     
+    nav{
+        z-index:1;
+    }
     
    .btn-circle {
       width: 45px;
@@ -36,32 +39,51 @@
 </head>
 <body>
 
-<nav class="navbar navbar-light bg-light">
-  <span class="navbar-brand mb-0 h1">Topology</span>
-</nav>
-<div id="container"></div>
 
+<div id="container">
+  <nav class="navbar navbar-light bg-light">
+    <span class="navbar-brand mb-0 h1">Topology</span>
+  </nav>
+  <div class="row">
+    <div id="graph" class="col-10"></div>
+    <div class="offset-10 col-2">
+      <div class="row justify-content-center">
+        <input id="oldElements" class="btn btn-primary m-2" type="button" value="Elements not found on new scan" style="display:none"/>  
+      </div>
+      <div class="row justify-content-center">
+        <button type="button" id='plus' class="btn btn-primary btn-circle  m-2">
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
+      <div class="row justify-content-center">
+        <button type="button" id='minus' class="btn btn-primary btn-circle m-2">
+          <i class="fas fa-minus"></i>
+        </button>
+      </div>
+      <div class="row justify-content-center">
+        <button type="button" id='center' class="btn btn-primary btn-circle m-2">
+          <i class="fas fa-expand"></i>
+        </button>
+      </div>
+      <div class="row">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th scope="col">Elements</th>
+            </tr>
+          </thead>
+          <tbody id="elements">
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+  </div>
 
-<div class="row">
-  <div class="col-lg-12">
-    <input id="oldElements" class="btn btn-primary float-right m-2" type="button" value="Elements not found on new scan" style="display:none"/>  
-  </div>
-  <div class="col-lg-12 ">
-    <button type="button" id='plus' class="btn btn-primary btn-circle float-right m-2">
-      <i class="fas fa-plus"></i>
-    </button>
-  </div>
-  <div class="col-lg-12">
-    <button type="button" id='minus' class="btn btn-primary btn-circle float-right m-2">
-      <i class="fas fa-minus"></i>
-    </button>
-  </div>
-  <div class="col-lg-12">
-    <button type="button" id='center' class="btn btn-primary btn-circle float-right m-2">
-      <i class="fas fa-expand"></i>
-    </button>
-  </div>
 </div>
+
+
+
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 
@@ -111,7 +133,7 @@
   
   var s=sigma.parsers.json('data.json', {
     renderer: {              
-        container: 'container',
+        container: 'graph',
         type: 'canvas'
     },
     settings: {
@@ -186,6 +208,7 @@
       
       s.graph.nodes().forEach(function(node, i, a) {
         
+        
         myItems["items"].forEach(function(e){
           if(node.id==e.id && e.new=="true"){
             node.color="#0F0"
@@ -193,6 +216,9 @@
         });
         node.x = Math.cos(Math.PI * 2 * i / a.length);
         node.y = Math.sin(Math.PI * 2 * i / a.length);
+        
+        
+          $('#elements').append('<tr i="'+node.id+'" x="'+node.x+'" y="'+node.y+'"><td>'+node.label+'</td></tr>')
       });
       var dragListener = sigma.plugins.dragNodes(s, s.renderers[0]);
             
@@ -236,6 +262,19 @@
         }, {
           duration: 200
         });
+      });
+      
+      $('#elements > tr').on('click',function(){
+        console.log(parseFloat($(this).attr('x')))
+        
+        sigma.misc.animation.camera(c, {
+          ratio: originalRatio,
+          x:parseFloat($(this).attr('x')),
+          y:parseFloat($(this).attr('y'))
+        }, {
+          duration: 200
+        });
+        
       });
     
       

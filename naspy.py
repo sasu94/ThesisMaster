@@ -72,6 +72,8 @@ def connectionSSH(ip, user, password):
         sh.send("show lldp neighbors detail\n")
         sh.send("\n")
         buff=''
+        
+        lldp=True
         while not re.search('.*#\r\n.*#.*',buff):
             if sh.recv_ready():
                 resp = sh.recv(9999).decode('ascii')    
@@ -79,6 +81,7 @@ def connectionSSH(ip, user, password):
                 buff+=resp
 
         if re.search('.*LLDP.*not.*',buff):
+            lldp=False
             buff=''
             sh.send("show cdp neighbors detail\n")
             sh.send("\n")
@@ -88,7 +91,7 @@ def connectionSSH(ip, user, password):
                     # code won't stuck here
                     buff+=resp
         
-        cdp=re.compile('--+').split(buff)[1:]
+        res=re.compile('--+').split(buff)[1:]
         
         
         buff=''
@@ -105,7 +108,7 @@ def connectionSSH(ip, user, password):
         sh.send("exit\r\n")
         
         arp=buff.split("\n")
-        list=(cdp,arp[2:(len(arp)-2)])
+        list=(res,arp[2:(len(arp)-2)],lldp)
         
     finally:
         client.close()
@@ -151,6 +154,40 @@ def parseCDP(text,curr):
     if(ip not in visited and ip not in toVisit):
         toVisit.append(ip)
         
+def parseLLDP(text, curr):
+    s=text.split("\n")
+    name=re.search('System Name: (.*)',s[5]).group(1).strip()
+    ip=re.search('.*IP: (.*)',s[16]).group(1).strip()
+    fr=re.search('.*: (.*)',s[1]).group(1).strip()
+    to=re.search('.*: (.*)',s[3]).group(1).strip()
+    plat=s[8].strip()
+    capa=re.search('.*System Capabilities: (.*)',s[13]).group(1).strip()
+#    print(name)
+#    print(ip)
+#    print(fr)
+#    print(to)
+#    print(plat)
+#    print(capa)
+#    print('--------------')
+    
+    if ip in elems:
+        element=elems[ip]
+        if element.type=='Unknown':
+            element.type=capa
+        if element.platform=='Unknown':
+            element.platform=platform
+        if element.name=='Unknown':
+            element.name=name       
+        
+        
+    else:
+        element=Element(capa,name,plat,ip)
+        elems[ip]=element
+    curr.addLink(Link(fr,to,element))
+    
+    if(ip not in visited and ip not in toVisit):
+        toVisit.append(ip)
+        
         
 def parseArp(text,curr):
 
@@ -173,8 +210,12 @@ def visit():
             print("unable to connect in ssh\n")
         else:
             curr=elems[ip]
-            for text in list[0]:
-                parseCDP(text,curr)
+            if(list[2]==True):
+                for text in list[0]:
+                    parseLLDP(text,curr)
+            else:                    
+                for text in list[0]:
+                    parseCDP(text,curr)
             for text in list[1]:
                 parseArp(text,curr)
             print('links found for '+ip+': '+str(len(curr.links)))
@@ -186,8 +227,8 @@ def constructJSON():
     
     first=True
     firstE=True
-    nodes='{"nodes":\n\t['
-    edges='"edges":\n\t['
+    nodes='{"nodes":[\n\t'
+    edges='"edges":[\n\t'
     cont=0
     computed=[]
     
@@ -209,30 +250,54 @@ def constructJSON():
                     edges+=',\n\t{"id":'+ str(cont) +', "source":"'+ip+'", "target": "'+edge.element.ip+'","from":"'+edge.port1+'", "to":"'+edge.port2+'"}'
                     computed.append((edge.port1, edge.port2))
                 cont+=1
-    nodes+=']\n,'
-    edges+=']\n}'
+    nodes+='\n],'
+    edges+='\n]}'
     
     
     s=nodes+edges
     
-    newFile=s
-    nF=newFile
-    nF=nF.split('\n')
-    element=nF[2][:7]+'"2'+nF[2][9:]
-    element2=nF[3][:7]+'"2'+nF[3][9:]
-    nF.insert(2,element)
-    nF.insert(4,element2)
+    nF=s.split('\n')
+    #element=nF[2][:7]+'"2'+nF[2][9:]
+    #element2=nF[3][:7]+'"2'+nF[3][9:]
+    #nF.insert(2,element)
+    #nF.insert(4,element2)
     with open('Webpage/data.json') as f2:
         oldFile=f2.read()
-        
+
     newElements=[]
     for line in list(difflib.unified_diff(oldFile.split('\n'), nF, fromfile='oldFile', tofile='newFile',lineterm="\n"))[2:]:
-        if line[0]=='+':
-            newElements.append(line[1:len(line)-2]+', "new":"true"}')
-        if line[0]=='-':
-            newElements.append(line[1:len(line)-2]+', "new":"false"}')
-
+        end=0
+        if line[len(line)-1]==',':
+            end=len(line)-2
+        else:
+            end=len(line)-1
+    
+        if line.__contains__('{'):
+            if line[0]=='+':
+                newElements.append(line[1:end]+', "new":"true"}')
+            if line[0]=='-':
+                newElements.append(line[1:end]+', "new":"false"}')
+      
+    
+    toRemove=[]
+    for i in range(len(newElements)):
+        je1=json.loads(newElements[i])
+        if 'source' in je1:
+            toRemove.append(newElements[i])
+        for j in range (i+1,len(newElements)):
+            je2=json.loads(newElements[j])
+            if(je1['id']==je2['id'] and je1['new']!=je2['new']):
+                if newElements[i] not in toRemove:
+                    toRemove.append(newElements[i])
+                if newElements[j] not in toRemove:
+                    toRemove.append(newElements[j])
+       
+    for i in toRemove:
+        if i in newElements:
+            newElements.remove(i)
+      
     diffFile='{"items":['+",\n".join(newElements)+']}'
+
 
     with open('Webpage/diff.json','w+') as d:
         d.write(diffFile)
