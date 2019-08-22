@@ -1,9 +1,16 @@
 {"nodes":[
-	{"id":"10.0.0.3", "label":"Switch1.switch","x":0,"y":0,"size":1,"mac":"0c7e.c6df.8001"},
-	{"id":"10.0.0.4", "label":"Switch2.switch","x":0,"y":1,"size":1,"mac":"0c7e.c672.8001"},
-	{"id":"10.0.0.5", "label":"Switch3.switch","x":0,"y":1,"size":1,"mac":"0c7e.c623.8001"}
+	{"id":"10.0.0.1", "label":"R-1","x":0,"y":0,"size":1,"mac":"ca01.1d5d.0006"},
+	{"id":"10.0.0.2", "label":"Unknown","x":0,"y":1,"size":1,"mac":"0800.270c.39c0"},
+	{"id":"10.0.0.3", "label":"Switch1.switch","x":0,"y":1,"size":1,"mac":"0c57.cdb8.8001"},
+	{"id":"10.0.0.4", "label":"Switch2.switch","x":0,"y":1,"size":1,"mac":"0c57.cdd5.8001"},
+	{"id":"10.0.0.5", "label":"Switch3.switch","x":0,"y":1,"size":1,"mac":"0c57.cd11.8001"},
+	{"id":"10.0.0.6", "label":"EXOS-VM","x":0,"y":1,"size":1,"mac":"0c57.cd95.ea00"}
 ],"edges":[
-	{"id":0, "source":"10.0.0.3", "target": "10.0.0.4","from":"Gi0/1", "to":"Gi0/0"},
+	{"id":0, "source":"10.0.0.3", "target": "10.0.0.6","from":"Gi0/3", "to":"1"},
 	{"id":1, "source":"10.0.0.3", "target": "10.0.0.5","from":"Gi0/2", "to":"Gi0/0"},
-	{"id":2, "source":"10.0.0.4", "target": "10.0.0.5","from":"Gi0/1", "to":"Gi0/1"}
+	{"id":2, "source":"10.0.0.3", "target": "10.0.0.4","from":"Gi0/1", "to":"Gi0/0"},
+	{"id":3, "source":"10.0.0.3", "target": "10.0.0.1","from":"GigabitEthernet0/0", "to":"FastEthernet0/1"},
+	{"id":4, "source":"10.0.0.4", "target": "10.0.0.6","from":"Gi0/2", "to":"2"},
+	{"id":5, "source":"10.0.0.4", "target": "10.0.0.5","from":"Gi0/1", "to":"Gi0/1"},
+	{"id":6, "source":"10.0.0.5", "target": "10.0.0.2","from":"Gi0/2", "to":"Unknown"}
 ]}
