@@ -138,24 +138,37 @@ class CiscoElement(Element):
         added=False  
         try:       
             s=text.split("\n")
-            name=re.search('Device ID: (.*)',s[1]).group(1).strip()
-            ip=re.search('.*IP address: (.*)',s[3]).group(1).strip()
-            ports=s[5].split(',')
-            fr=re.search('.*: (.*)',ports[0]).group(1).strip()
-            to=re.search('.*: (.*)',ports[1]).group(1).strip()
-            info=s[4].split(',')
-            plat=re.search('.*Platform: (.*)',info[0]).group(1).strip()
-            capa=re.search('.*Capabilities: (.*)',info[1]).group(1).strip()
-            #print(name)
-            #print(ip)
-            #print(fr)
-            #print(to)
-            #print(plat)
-            #print(capa)
-            #print('--------------')
+            
+            name=ip=fr=to=plat=capa='Unknown'
+            
+            for t in s:
+                if re.search('Device ID: (.*)',t):
+                    name=re.search('Device ID: (.*)',t).group(1).strip()
+                elif re.search('.*IP address: (.*)',t):
+                    ip=re.search('.*IP address: (.*)',t).group(1).strip()
+                elif re.search('.*Interface:.*',t):
+                    ports=t.split(',')
+                    fr=re.search('.*: (.*)',ports[0]).group(1).strip()        
+                    to=re.search('.*: (.*)',ports[1]).group(1).strip()
+                elif re.search('.*Platform:.*',t):
+                    info=t.split(',')
+                    plat=re.search('.*Platform: (.*)',info[0]).group(1).strip()        
+                    capa=re.search('.*Capabilities: (.*)',info[1]).group(1).strip()
             
             
-            if ip in elems:
+            if plat.__contains__('EXOS'):
+                to='Port '+to
+            
+#            print(name)
+#            print(ip)
+#            print(fr)
+#            print(to)
+#            print(plat)
+#            print(capa)
+#            print('--------------')
+            
+            
+            if ip in elems and isinstance(elems[ip],(ExtremeElement,CiscoElement)):
                 element=elems[ip]
                 if element.type=='Unknown':
                     element.type=capa
@@ -168,7 +181,7 @@ class CiscoElement(Element):
             else:
                 if plat.__contains__('Cisco'):
                     element=CiscoElement(capa,name,plat,ip)
-                elif plat.__contains__('Extreme'):
+                elif plat.__contains__('EXOS'):
                     element=ExtremeElement(capa,name,plat,ip)
                 else:
                     element=Element(capa,name,plat,ip)
@@ -218,7 +231,7 @@ class CiscoElement(Element):
         #    print(capa)
         #    print('--------------')
             
-            if ip in elems:
+            if ip in elems and isinstance(elems[ip],(ExtremeElement,CiscoElement)):
                 element=elems[ip]
                 if element.type=='Unknown':
                     element.type=capa
@@ -332,8 +345,6 @@ class ExtremeElement(Element):
                 if self.parseLLDP(text):
                     count+=1
                     
-            print('count after lldp '+str(count))
-            
             cdpbuff=''
             sh.send("show cdp neighbor detail\n")
             sh.send("\n")
@@ -345,6 +356,9 @@ class ExtremeElement(Element):
             if not re.search('.*CDP.*not.*',lldpbuff):
                 cdp=re.compile('--+').split(cdpbuff)[1:]
             
+            for text in cdp:
+                if self.parseCDP(text):
+                    count+=1
             
             buff=''
             sh.send("show iparp\n")
@@ -355,10 +369,11 @@ class ExtremeElement(Element):
                     resp = sh.recv(9999).decode('ascii')    
                     # code won't stuck here
                     buff+=resp
-
             
             arp=buff.split("\n")
-            arp=arp[2:(len(arp)-2)]
+            arp=arp[3:(len(arp)-18)]
+            for text in arp:
+                self.parseArp(text)
             
             buff=''
             sh.send("show fdb\n")
@@ -374,35 +389,46 @@ class ExtremeElement(Element):
             sh.send("exit\r\n")
             
             mac_table=buff.split("\n")
-            mac_table=mac_table[6:(len(mac_table)-3)]
+            mac_table=mac_table[4:(len(mac_table)-12)]
             
-            list=(cdp,arp,lldp,mac_table)
+            count+=self.parseMacTable(mac_table)
+            
+            print('links found for '+self.ip+': '+str(count))
            
         except:
             print('unable to connect to SSH')
         finally:
             client.close()
-            return(list)
         
     def parseCDP(self,text):
         added=False  
         try:       
             s=text.split("\n")
-            name=re.search('Device ID: (.*)',s[1]).group(1).strip()
-            ip=re.search('.*IP address: (.*)',s[3]).group(1).strip()
-            ports=s[5].split(',')
-            fr=re.search('.*: (.*)',ports[0]).group(1).strip()
-            to=re.search('.*: (.*)',ports[1]).group(1).strip()
-            info=s[4].split(',')
-            plat=re.search('.*Platform: (.*)',info[0]).group(1).strip()
-            capa=re.search('.*Capabilities: (.*)',info[1]).group(1).strip()
-            #print(name)
-            #print(ip)
-            #print(fr)
-            #print(to)
-            #print(plat)
-            #print(capa)
-            #print('--------------')
+            
+            name=ip=fr=to=plat=capa='Unknown'
+            
+            for t in s:
+                if re.search('Device ID\s+: (.*)',t):
+                    name=re.search('Device ID\s+: (.*)',t).group(1).strip()
+                elif re.search('.*IP Addresses.*',t):
+                    ip=re.search('\t(.*)',s[s.index(t)+1]).group(1).strip()
+                elif re.search('.*Port ID.*',t):
+                    to=re.search('.*Port ID.*: (.*)',t).group(1).strip()
+                elif re.search('.*Interface.*',t):
+                    fr='Port '+re.search('.*Interface.*: (.*)',t).group(1).strip()
+                elif re.search('.*Platform.*:.*',t):
+                    plat=re.search('.*Platform.*: (.*)',t).group(1).strip()        
+                elif re.search('.*Capabilities.*:.*',t):
+                    capa=re.search('.*Capabilities.*: (.*)',info[1]).group(1).strip()
+                    
+                    
+#            print(name)
+#            print(ip)
+#            print(fr)
+#            print(to)
+#            print(plat)
+#            print(capa)
+#            print('--------------')
             
             
             if ip in elems:
@@ -426,20 +452,20 @@ class ExtremeElement(Element):
                 
             l=Link(fr,to,element)
             
-            if l not in curr.links:
+            if l not in self.links:
                 added=True
-                curr.addLink(l)
+                self.addLink(l)
             
             if(ip not in visited and ip not in toVisit):
                 #print('added to visit from cdp '+element.ip)
                 toVisit.append(ip)
-        except:
+        except Exception as e:
             print('found new element but not enough information to be added\n')
+            print(e)
         finally:
             return added
             
     def parseLLDP(self, text):
-        print(text)
         added=False
         try:
             s=text.split("\n")
@@ -506,43 +532,43 @@ class ExtremeElement(Element):
             
             
     def parseArp(self,text):
-
         text=re.compile('\s\s+').split(text)
         ip=text[1]
-        mac=text[3]
+        mac=text[2]
         
         element=None
         
         if ip in elems:
             element=elems[ip]
         else:
-            element=Element("Unknown","Unknown","unknown",ip)
+            element=Element("Unknown","Unknown","Unknown",ip)
             elems[ip]=element
             
-        element.addMac(mac)
+        if(element.mac==''):
+            element.addMac(mac)
         
-        elemsByMac[mac]=element
+        if mac not in elemsByMac:
+            elemsByMac[mac]=element
 
     def parseMacTable(self, text):
         
         added=0
         single_occurrences=[]
         
-        
         for i in range(len(text)):
             r1=re.compile('\s\s+').split(text[i])
             found=False
             for j in range(len(text)):
                 r2=re.compile('\s\s+').split(text[j])
-                if(r1[4]==r2[4] and r1[2]!=r2[2]):
+                if(r1[3]==r2[3] and r1[0]!=r2[0]):
                     found=True
             if not found:
                 single_occurrences.append(r1)
                 
         for entry in single_occurrences:
-            if entry[2] in elemsByMac:
-                element=elemsByMac[entry[2]]
-                l=Link(entry[4].strip(),'Unknown',element)
+            if entry[0] in elemsByMac:
+                element=elemsByMac[entry[3]]
+                l=Link('Port '+entry[3].strip(),'Unknown',element)
                 
                 if l not in curr.links:
                     added+=1
@@ -661,7 +687,6 @@ def constructJSON():
         if 'source' in je1:
             toRemove.append(newElements[i])
         for j in range (i+1,len(newElements)):
-            print(newElements[j])
             je2=json.loads(newElements[j])
             if(je1['id']==je2['id'] and je1['new']!=je2['new']):
                 if newElements[i] not in toRemove:
@@ -689,11 +714,18 @@ def sniff(timeout):
         cap.sniff(packet_count=1,timeout=timeout)
         if cap:
             pack=cap[0]
-            id=pack.cdp.deviceid
-            ip=pack.cdp.nrgyz_ip_address
-            capa=pack.cdp.capabilities
-            platform=pack.cdp.platform
-            root=Element(capa,id,platform,ip)
+            id=pack.cdp.deviceid.strip()
+            ip=pack.cdp.nrgyz_ip_address.strip()
+            capa=pack.cdp.capabilities.strip()
+            platform=pack.cdp.platform.strip()
+            
+            if platform=='Cisco':
+                root=CiscoElement(capa,id,platform,ip)
+            elif platform=='EXOS' or platform=='Extreme':
+                root=ExtremeElement(capa,id,platform,ip)
+            else:
+                root=Element(capa,id,platform,ip)
+                        
             elems[ip]=root
             toVisit.append(ip)
             visit()
@@ -721,7 +753,7 @@ if len(sys.argv)>1:
             visit()
         
     else:
-        print("usage: naspy.py -a [timeout] for automatic sniff of cdp packet (180s default)\ntestSSH.py -m ip for manual search")
+        print("usage: naspy.py -a [timeout] for automatic sniff of cdp packet (180s default)\nnaspy.py -m ip for manual search")
 else:
-    print("usage: nas.py -a [timeout] for automatic sniff of cdp packet (180s default)\ntestSSH.py -m ip for manual search")
+    print("usage: naspy.py -a [timeout] for automatic sniff of cdp packet (180s default)\nnaspy.py -m ip for manual search")
 
