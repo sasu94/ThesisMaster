@@ -32,6 +32,10 @@
       position: relative;
       top: -1px;
     } 
+    
+    .responsive-width{
+      font-size: 3vw;
+    }
 
 </style>
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -48,20 +52,22 @@
     <div id="graph" class="col-10"></div>
     <div class="offset-10 col-2">
       <div class="row justify-content-center">
-        <input id="oldElements" class="btn btn-primary m-2" type="button" value="Elements not found on new scan" style="display:none"/>  
+        <button id="oldElements" class="btn btn-primary btn-circle m-2"  style="display:none">
+          <i class="fas fa-history"></i>
+        </button>
       </div>
       <div class="row justify-content-center">
-        <button type="button" id='plus' class="btn btn-primary btn-circle  m-2">
+        <button id='plus' class="btn btn-primary btn-circle  m-2">
           <i class="fas fa-plus"></i>
         </button>
       </div>
       <div class="row justify-content-center">
-        <button type="button" id='minus' class="btn btn-primary btn-circle m-2">
+        <button id='minus' class="btn btn-primary btn-circle m-2">
           <i class="fas fa-minus"></i>
         </button>
       </div>
       <div class="row justify-content-center">
-        <button type="button" id='center' class="btn btn-primary btn-circle m-2">
+        <button id='center' class="btn btn-primary btn-circle m-2">
           <i class="fas fa-expand"></i>
         </button>
       </div>

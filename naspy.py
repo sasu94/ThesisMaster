@@ -1,5 +1,4 @@
 import paramiko
-import time
 import re
 import json
 import pyshark
@@ -13,6 +12,12 @@ toVisit=[]
 visited=[]
 elems={}
 elemsByMac={}
+
+class EntryNotFoundException(Exception):
+    pass
+
+class ElementException(Exception):
+    pass
 
 class Element:
     def __init__(self,type,name,platform,ip):
@@ -38,6 +43,7 @@ class Element:
         return json.dumps(self,default=lambda o:o.__dict__)
     def connectionSSH(self,db):
         print("\ntrying to connect to: "+self.ip+"\n\nunable to connect to SSH")
+        return 0
     
     
 class CiscoElement(Element):
@@ -49,13 +55,19 @@ class CiscoElement(Element):
         try:
             client=paramiko.SSHClient()
             if ip not in db:
-                print('unable to connect to SSH')
-                return
+                raise EntryNotFoundException
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(hostname=ip,username=db[ip]['user'],password=db[ip]['pass'])
 
             sh=client.invoke_shell()
             sh.send("en\n")
+            resp=''
+            while not re.search('.*Password.*',resp):
+                if sh.recv_ready():
+                    resp = sh.recv(9999).decode('ascii')
+                    if resp.__contains__('Incomplete'):
+                        raise ElementException
+            
             sh.send(db[ip]['en']+"\n")
             sh.send("terminal length 0\n")
             sh.send("show lldp neighbors detail\n")
@@ -129,10 +141,12 @@ class CiscoElement(Element):
             
             print('links found for '+self.ip+': '+str(count))
            
-        except:
+        except Exception as e:
             print('unable to connect to SSH')
+            print(e)
         finally:
             client.close()
+            return count
         
     def parseCDP(self, text):
         added=False  
@@ -323,12 +337,20 @@ class ExtremeElement(Element):
         try:
             client=paramiko.SSHClient()
             if ip not in db:
-                return
+                raise EntryNotFoundException
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(hostname=ip,username=db[ip]['user'],password=db[ip]['pass'])
             
             sh=client.invoke_shell()
             sh.send("disable clipaging\n")
+            resp=''
+            while not re.search('.*EXOS-VM.2.*#',resp):
+                if sh.recv_ready():
+                    resp = sh.recv(9999).decode('ascii')
+                    if resp.__contains__('Invalid'):
+                        raise ElementException
+            
+            
             sh.send("show lldp neighbors detailed\n")
             sh.send("\n")
             lldpbuff=''
@@ -395,10 +417,12 @@ class ExtremeElement(Element):
             
             print('links found for '+self.ip+': '+str(count))
            
-        except:
+        except Exception as e:
             print('unable to connect to SSH')
+            print(e)
         finally:
             client.close()
+            return count
         
     def parseCDP(self,text):
         added=False  
@@ -617,13 +641,16 @@ def decryptdb():
 
 def visit():
     db=decryptdb()
+    found=False
     while(toVisit):
         ip=toVisit.pop(0)
         element=elems[ip]
-        element.connectionSSH(db)
+        if element.connectionSSH(db)>0:
+            found=True
         visited.append(ip)
-        
-    constructJSON()
+    
+    if found:
+        constructJSON()
         
 def constructJSON():
     
@@ -659,10 +686,6 @@ def constructJSON():
     s=nodes+edges
     
     nF=s.split('\n')
-    #element=nF[2][:7]+'"2'+nF[2][9:]
-    #element2=nF[3][:7]+'"2'+nF[3][9:]
-    #nF.insert(2,element)
-    #nF.insert(4,element2)
     with open('Webpage/data.json') as f2:
         oldFile=f2.read()
 
@@ -746,12 +769,12 @@ if len(sys.argv)>1:
         toVisit.append(ip)
         visit()
         if(len(elems)==1):
+            print('Probably not a Cisco device, trying with an Extreme')
             elems={}
             root=ExtremeElement("Unknown","Unknown","Unknown",ip)
             elems[ip]=root
             toVisit.append(ip)
             visit()
-        
     else:
         print("usage: naspy.py -a [timeout] for automatic sniff of cdp packet (180s default)\nnaspy.py -m ip for manual search")
 else:
