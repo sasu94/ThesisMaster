@@ -5,6 +5,10 @@ import pyshark
 import sys
 import json
 import os
+if os.geteuid() != 0:
+    print('You need to run as root!')
+    exit()
+
 import difflib
 from cryptography.fernet import Fernet
 
@@ -733,30 +737,38 @@ def constructJSON():
 def sniff(timeout):
     try:
         print("start sniffing\n")
-        cap=pyshark.LiveCapture('eth0',display_filter='cdp')
+        cap=pyshark.LiveCapture('eth0',display_filter='cdp or lldp')
         cap.sniff(packet_count=1,timeout=timeout)
         if cap:
             pack=cap[0]
-            id=pack.cdp.deviceid.strip()
-            ip=pack.cdp.nrgyz_ip_address.strip()
-            capa=pack.cdp.capabilities.strip()
-            platform=pack.cdp.platform.strip()
-            
-            if platform=='Cisco':
+            root=None
+            if 'cdp' in pack:
+                id=pack.cdp.deviceid.strip()
+                ip=pack.cdp.nrgyz_ip_address.strip()
+                capa=pack.cdp.capabilities.strip()
+                platform=pack.cdp.platform.strip()               
+            else:
+                id=pack.lldp.tlv_system_name.strip()
+                ip=pack.lldp.mgn_addr_ip4.strip()
+                capa=pack.lldp.tlv_system_cap.strip()
+                platform=pack.lldp.tlv_system_desc.strip()           
+                
+            if platform.__contains__('Cisco'):
                 root=CiscoElement(capa,id,platform,ip)
-            elif platform=='EXOS' or platform=='Extreme':
+            elif platform.__contains__('EXOS') or platform.__contains__('Extreme'):
                 root=ExtremeElement(capa,id,platform,ip)
             else:
-                root=Element(capa,id,platform,ip)
-                        
+                root=Element(capa,id,platform,ip)    
+                
             elems[ip]=root
             toVisit.append(ip)
             visit()
         else:
             print("time expired")
     finally:
-        cap.close()
-
+        cap.eventloop.close()
+        
+        
 if len(sys.argv)>1:
     if sys.argv[1]=="-a" and len(sys.argv)==3:
         sniff(int(sys.argv[2]))
