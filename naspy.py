@@ -8,7 +8,7 @@ import os
 if os.geteuid() != 0:
     print('You need to run as root!')
     exit()
-
+from LogSender import *
 import difflib
 from cryptography.fernet import Fernet
 
@@ -69,7 +69,7 @@ class CiscoElement(Element):
             while not re.search('.*Password.*',resp):
                 if sh.recv_ready():
                     resp = sh.recv(9999).decode('ascii')
-                    if resp.__contains__('Incomplete'):
+                    if 'Incomplete' in resp:
                         raise ElementException
             
             sh.send(db[ip]['en']+"\n")
@@ -145,9 +145,8 @@ class CiscoElement(Element):
             
             print('links found for '+self.ip+': '+str(count))
            
-        except Exception as e:
+        except:
             print('unable to connect to SSH')
-            print(e)
         finally:
             client.close()
             return count
@@ -174,7 +173,7 @@ class CiscoElement(Element):
                     capa=re.search('.*Capabilities: (.*)',info[1]).group(1).strip()
             
             
-            if plat.__contains__('EXOS'):
+            if 'EXOS' in plat  or 'Extreme' in plat:
                 to='Port '+to
             
 #            print(name)
@@ -197,9 +196,9 @@ class CiscoElement(Element):
                 
                 
             else:
-                if plat.__contains__('Cisco'):
+                if 'Cisco' in plat:
                     element=CiscoElement(capa,name,plat,ip)
-                elif plat.__contains__('EXOS'):
+                elif 'EXOS' in plat or 'Extreme' in plat:
                     element=ExtremeElement(capa,name,plat,ip)
                 else:
                     element=Element(capa,name,plat,ip)
@@ -258,9 +257,9 @@ class CiscoElement(Element):
                 if element.name=='Unknown':
                     element.name=name         
             else:
-                if plat.__contains__('Cisco'):
+                if 'Cisco' in plat:
                     element=CiscoElement(capa,name,plat,ip)
-                elif plat.__contains__('Extreme'):
+                elif 'Extreme' in plat or 'EXOS' in plat:
                     element=ExtremeElement(capa,name,plat,ip)
                 else:
                     element=Element(capa,name,plat,ip)
@@ -292,7 +291,7 @@ class CiscoElement(Element):
         if ip in elems:
             element=elems[ip]
         else:
-            element=Element("Unknown","Unknown","unknown",ip)
+            element=Element("Unknown","Unknown","Unknown",ip)
             elems[ip]=element
             
         element.addMac(mac)
@@ -351,7 +350,7 @@ class ExtremeElement(Element):
             while not re.search('.*EXOS-VM.2.*#',resp):
                 if sh.recv_ready():
                     resp = sh.recv(9999).decode('ascii')
-                    if resp.__contains__('Invalid'):
+                    if 'Invalid' in resp:
                         raise ElementException
             
             
@@ -421,9 +420,8 @@ class ExtremeElement(Element):
             
             print('links found for '+self.ip+': '+str(count))
            
-        except Exception as e:
+        except:
             print('unable to connect to SSH')
-            print(e)
         finally:
             client.close()
             return count
@@ -470,9 +468,9 @@ class ExtremeElement(Element):
                 
                 
             else:
-                if plat.__contains__('Cisco'):
+                if 'Cisco' in plat:
                     element=CiscoElement(capa,name,plat,ip)
-                elif plat.__contains__('Extreme'):
+                elif 'Extreme' in plat:
                     element=ExtremeElement(capa,name,plat,ip)
                 else:
                     element=Element(capa,name,plat,ip)
@@ -536,9 +534,9 @@ class ExtremeElement(Element):
                 if element.name=='Unknown':
                     element.name=name         
             else:
-                if plat.__contains__('Cisco'):
+                if 'Cisco' in plat:
                     element=CiscoElement(capa,name,plat,ip)
-                elif plat.__contains__('Extreme'):
+                elif 'Extreme' in plat or 'EXOS' in plat:
                     element=ExtremeElement(capa,name,plat,ip)
                 else:
                     element=Element(capa,name,plat,ip)
@@ -701,7 +699,7 @@ def constructJSON():
         else:
             end=len(line)-1
     
-        if line.__contains__('{'):
+        if '{' in line:
             if line[0]=='+':
                 newElements.append(line[1:end]+', "new":"true"}')
             if line[0]=='-':
@@ -733,6 +731,10 @@ def constructJSON():
              
     with open('Webpage/data.json','w') as file:
         file.write("\n".join(nF))
+        
+    logSender=LogSender()
+    print()
+    #logSender.send('salvatore.mon@gmail.com','Scan finished!','Results',["\n".join(nF),diffFile],['json','json'],['data','diff'])
 
 def sniff(timeout):
     try:
@@ -753,9 +755,9 @@ def sniff(timeout):
                 capa=pack.lldp.tlv_system_cap.strip()
                 platform=pack.lldp.tlv_system_desc.strip()           
                 
-            if platform.__contains__('Cisco'):
+            if 'Cisco' in platform:
                 root=CiscoElement(capa,id,platform,ip)
-            elif platform.__contains__('EXOS') or platform.__contains__('Extreme'):
+            elif 'EXOS' in platform or 'Extreme' in platform:
                 root=ExtremeElement(capa,id,platform,ip)
             else:
                 root=Element(capa,id,platform,ip)    
