@@ -24,6 +24,32 @@ class ElementException(Exception):
     pass
 
 class Element:
+    """
+    An abstract class modeling an element in the topology
+    ----------
+    type : str
+        the typology of element
+    name : str
+        the name of the element
+    platform : str
+        the platform of the element
+    ip : str
+        the IP address of the element
+    mac : str
+        the MAC address of the element
+    links : list(Link)
+        the list of links of the element
+    Methods
+    -------
+    connectionSSH()
+        Perform the connection to SSH to the element
+    addLink()
+        Adds a link to the list of links
+    addMac()
+        Adds the MAC address to the element
+    """
+    
+    
     def __init__(self,type,name,platform,ip):
         self.type=type
         self.name=name
@@ -40,18 +66,105 @@ class Element:
 
     
     def addMac(self,mac):
+        """
+        Adds the MAC address to the element
+        
+        Parameters
+        ----------
+        mac:str
+            the MAC address to add
+
+        """
         self.mac=mac
     def addLink(self,link):
+        """
+        Adds a link to the list of links
+        
+        Parameters
+        ----------
+        link:Link
+            the link to add
+
+        """
         self.links.append(link)
     def toJSON(self):
         return json.dumps(self,default=lambda o:o.__dict__)
     def connectionSSH(self,db):
+        """
+        Perform the connection to SSH to the element
+        
+        Parameters
+        ----------
+        db:dict
+            the dictionary of credentials
+
+        Returns
+        -------
+        int
+            returns the count of elements found
+
+        """
         print("\ntrying to connect to: "+self.ip+"\n\nunable to connect to SSH")
         return 0
+    
+    def parseCDP(self, text):
+        """
+        Parses an entry for CDP table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+        """
+        pass
+    def parseLLDP(self,text):
+        """
+        Parses an entry of the LLDP table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+        """
+        pass
+    def parseArp(self,text):
+        """
+        Parses an ARP Table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+        """
+        pass
+    def parseMacTable(self, text):
+        """
+        Parses a mac Table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+        """
+        pass
     
     
 class CiscoElement(Element):
     def connectionSSH(self,db):
+        """
+        Perform the connection to SSH to the element
+        
+        Parameters
+        ----------
+        db:dict
+            the dictionary of credentials
+
+        Returns
+        -------
+        int
+            returns the count of elements found
+
+        """
         list=[]
         ip=self.ip
         count=0
@@ -113,8 +226,7 @@ class CiscoElement(Element):
             
             while not re.search('.*#\r\n.*#.*',buff):
                 if sh.recv_ready():
-                    resp = sh.recv(9999).decode('ascii')    
-                    # code won't stuck here
+                    resp = sh.recv(9999).decode('ascii')
                     buff+=resp
 
             
@@ -132,7 +244,6 @@ class CiscoElement(Element):
             while not re.search('.*#\r\n.*#.*',buff):
                 if sh.recv_ready():
                     resp = sh.recv(9999).decode('ascii')    
-                    # code won't stuck here
                     buff+=resp
 
             
@@ -152,6 +263,20 @@ class CiscoElement(Element):
             return count
         
     def parseCDP(self, text):
+        """
+        Parses an entry for CDP table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+
+        Returns
+        -------
+        bool
+            returns true if the element is added, false otherwise
+
+        """
         added=False  
         try:       
             s=text.split("\n")
@@ -175,15 +300,6 @@ class CiscoElement(Element):
             
             if 'EXOS' in plat  or 'Extreme' in plat:
                 to='Port '+to
-            
-#            print(name)
-#            print(ip)
-#            print(fr)
-#            print(to)
-#            print(plat)
-#            print(capa)
-#            print('--------------')
-            
             
             if ip in elems and isinstance(elems[ip],(ExtremeElement,CiscoElement)):
                 element=elems[ip]
@@ -211,7 +327,6 @@ class CiscoElement(Element):
                 self.addLink(l)
             
             if(ip not in visited and ip not in toVisit):
-                #print('added to visit from cdp '+element.ip)
                 toVisit.append(ip)
         except:
             print('found new element but not enough information to be added\n')
@@ -219,6 +334,20 @@ class CiscoElement(Element):
             return added
             
     def parseLLDP(self,text):
+        """
+        Parses an entry of the LLDP table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+
+        Returns
+        -------
+        bool
+            returns true if the element is added, false otherwise
+
+        """
         
         added=False
         try:
@@ -239,14 +368,7 @@ class CiscoElement(Element):
                     capa=re.search('.*System Capabilities: (.*)',t).group(1).strip()
                 elif re.search('.*System Description: (.*)',t):
                     plat=s[s.index(t)+1].strip()
-            
-        #    print(name)
-        #    print(ip)
-        #    print(fr)
-        #    print(to)
-        #    print(plat)
-        #    print(capa)
-        #    print('--------------')
+
             
             if ip in elems and isinstance(elems[ip],(ExtremeElement,CiscoElement)):
                 element=elems[ip]
@@ -272,7 +394,6 @@ class CiscoElement(Element):
                 self.addLink(l)
             
             if(ip not in visited and ip not in toVisit):
-                #print('added to visit from lldp '+element.ip)
                 toVisit.append(ip)
         except:
             print('found new element but not enough information to be added\n')
@@ -281,6 +402,14 @@ class CiscoElement(Element):
             
             
     def parseArp(self,text):
+        """
+        Parses an ARP Table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+        """
 
         text=re.compile('\s\s+').split(text)
         ip=text[1]
@@ -299,6 +428,20 @@ class CiscoElement(Element):
         elemsByMac[mac]=element
 
     def parseMacTable(self, text):
+        """
+        Parses a mac Table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+
+        Returns
+        -------
+        int
+            returns the count of elements found
+
+        """
         
         added=0
         single_occurrences=[]
@@ -325,7 +468,6 @@ class CiscoElement(Element):
                     self.addLink(l)
                 
                 if(element.ip not in visited and element.ip not in toVisit):
-                    #print('added to visit from mac '+element.ip)
                     toVisit.append(element.ip)
         
         return added
@@ -333,6 +475,20 @@ class CiscoElement(Element):
 
 class ExtremeElement(Element):
     def connectionSSH(self,db):
+        """
+        Perform the connection to SSH to the element
+        
+        Parameters
+        ----------
+        db:dict
+            the dictionary of credentials
+
+        Returns
+        -------
+        int
+            returns the count of elements found
+
+        """
         list=[]
         ip=self.ip
         count=0
@@ -392,7 +548,6 @@ class ExtremeElement(Element):
             while not re.search('.*# \r\n.*#.*',buff):
                 if sh.recv_ready():
                     resp = sh.recv(9999).decode('ascii')    
-                    # code won't stuck here
                     buff+=resp
             
             arp=buff.split("\n")
@@ -407,7 +562,6 @@ class ExtremeElement(Element):
             while not re.search('.*# \r\n.*#.*',buff):
                 if sh.recv_ready():
                     resp = sh.recv(9999).decode('ascii')    
-                    # code won't stuck here
                     buff+=resp
 
             
@@ -427,6 +581,20 @@ class ExtremeElement(Element):
             return count
         
     def parseCDP(self,text):
+        """
+        Parses an entry for CDP table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+
+        Returns
+        -------
+        bool
+            returns true if the element is added, false otherwise
+
+        """
         added=False  
         try:       
             s=text.split("\n")
@@ -446,15 +614,6 @@ class ExtremeElement(Element):
                     plat=re.search('.*Platform.*: (.*)',t).group(1).strip()        
                 elif re.search('.*Capabilities.*:.*',t):
                     capa=re.search('.*Capabilities.*: (.*)',info[1]).group(1).strip()
-                    
-                    
-#            print(name)
-#            print(ip)
-#            print(fr)
-#            print(to)
-#            print(plat)
-#            print(capa)
-#            print('--------------')
             
             
             if ip in elems:
@@ -483,15 +642,28 @@ class ExtremeElement(Element):
                 self.addLink(l)
             
             if(ip not in visited and ip not in toVisit):
-                #print('added to visit from cdp '+element.ip)
                 toVisit.append(ip)
-        except Exception as e:
+        except:
             print('found new element but not enough information to be added\n')
-            print(e)
         finally:
             return added
             
     def parseLLDP(self, text):
+        """
+        Parses an entry of the LLDP table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+
+        Returns
+        -------
+        bool
+            returns true if the element is added, false otherwise
+
+        """
+        
         added=False
         try:
             s=text.split("\n")
@@ -517,14 +689,6 @@ class ExtremeElement(Element):
                         index+=1
                     plat=plat[1:len(plat)-2]
             
-#            print(name)
-#            print(ip)
-#            print(fr)
-#            print(to)
-#            print(plat)
-#            print(capa)
-#            print('--------------')
-            
             if ip in elems:
                 element=elems[ip]
                 if element.type=='Unknown':
@@ -549,7 +713,6 @@ class ExtremeElement(Element):
                 self.addLink(l)
             
             if(ip not in visited and ip not in toVisit):
-                #print('added to visit from lldp '+element.ip)
                 toVisit.append(ip)
         except:
             print('found new element but not enough information to be added')
@@ -558,6 +721,14 @@ class ExtremeElement(Element):
             
             
     def parseArp(self,text):
+        """
+        Parses an ARP Table
+        
+        Parameters
+        ----------
+        text:str
+            the text to parse
+        """
         text=re.compile('\s\s+').split(text)
         ip=text[1]
         mac=text[2]
@@ -575,9 +746,24 @@ class ExtremeElement(Element):
         
         if mac not in elemsByMac:
             elemsByMac[mac]=element
-
+    
+     
     def parseMacTable(self, text):
+        """
+        Parses a mac Table
         
+        Parameters
+        ----------
+        text:str
+            the text to parse
+
+        Returns
+        -------
+        int
+            returns the count of elements found
+
+        """
+    
         added=0
         single_occurrences=[]
         
@@ -601,7 +787,6 @@ class ExtremeElement(Element):
                     curr.addLink(l)
                 
                 if(element.ip not in visited and element.ip not in toVisit):
-                    #print('added to visit from mac '+element.ip)
                     toVisit.append(element.ip)
         
         return added
@@ -609,6 +794,17 @@ class ExtremeElement(Element):
 
 
 class Link:
+    """
+    A class modeling a link between two elements
+    ----------
+    port1 : str
+        the port of the element owning this object
+    port2 : str
+        the port of the element connected
+    element : Element
+        the element with which is connected the one possessing this object
+    """
+    
     def __init__(self,port1,port2,element):
         self.port1=port1
         self.port2=port2
@@ -619,9 +815,17 @@ class Link:
 
     def __hash__(self):
         return hash(self.element.ip)
+      
+def decryptdb():
+    """
+    Takes the file with the database of entries and decrypts it
 
-        
-def decryptdb():    
+    Returns
+    -------
+    dict
+        returns a dictionary consisting in the database
+
+    """ 
     key=os.environ.get('KEY')
     fernet = Fernet(key)
 
@@ -642,6 +846,10 @@ def decryptdb():
     return db
 
 def visit():
+    """
+    A BFS that visits the topology
+    """
+
     db=decryptdb()
     found=False
     while(toVisit):
@@ -654,7 +862,12 @@ def visit():
     if found:
         constructJSON()
         
+        
 def constructJSON():
+    """
+    Constructs the json outputs and sends an email with the results
+    """
+    
     
     first=True
     firstE=True
@@ -734,9 +947,21 @@ def constructJSON():
         
     logSender=LogSender()
     print()
-    #logSender.send('salvatore.mon@gmail.com','Scan finished!','Results',["\n".join(nF),diffFile],['json','json'],['data','diff'])
+    logSender.send('salvatore.mon@gmail.com','Scan finished!','Results',["\n".join(nF),diffFile],['json','json'],['data','diff'])
+    
+    
+
 
 def sniff(timeout):
+    """
+    Tries to sniff a packet CDP or LLDP and then starts a visit
+    
+    Parameters
+    ----------
+    timeout : int
+        the maximum time in seconds to wait to receive a packet
+
+    """
     try:
         print("start sniffing\n")
         cap=pyshark.LiveCapture('eth0',display_filter='cdp or lldp')
