@@ -10,6 +10,7 @@ if os.geteuid() != 0:
     exit()
 from LogSender import *
 import difflib
+import socket
 from cryptography.fernet import Fernet
 
 toVisit=[]
@@ -18,9 +19,16 @@ elems={}
 elemsByMac={}
 
 class EntryNotFoundException(Exception):
+    """
+    An exception raised if the entry is not present in the
+    database of credentials
+    """
     pass
 
 class ElementException(Exception):
+    """
+    An exception raised if the element was instantiated with the wrong class
+    """
     pass
 
 class Element:
@@ -946,8 +954,11 @@ def constructJSON():
         file.write("\n".join(nF))
         
     logSender=LogSender()
-    print()
-    logSender.send('salvatore.mon@gmail.com','Scan finished!','Results',["\n".join(nF),diffFile],['json','json'],['data','diff'])
+    
+    if logSender.send('Scan finished!','Results',attachment=["\n".join(nF),diffFile],att_type=['json','json'],fname=['data','diff']):
+        print("\nThe result had been sent via mail!")
+    else:
+        print("\nAn error occured while sending the mail!")
     
     
 
@@ -995,27 +1006,50 @@ def sniff(timeout):
     finally:
         cap.eventloop.close()
         
+
+
+def valid_ip(address):
+    """
+    A method that checks if the string provided is a valid IP address
+    
+    Parameters
+    ----------
+    address:string
+        the string to check
+
+    Returns
+    -------
+    bool
+        returns true if the string is an IP false otherwise
+
+    """
+    try: 
+        socket.inet_aton(address)
+        return True
+    except:
+        return False
         
-if len(sys.argv)>1:
-    if sys.argv[1]=="-a" and len(sys.argv)==3:
-        sniff(int(sys.argv[2]))
-    elif sys.argv[1]=="-a":
-        sniff(180)
-    elif sys.argv[1]=="-m" and len(sys.argv)==3:
-        ip=sys.argv[2]
-        root=CiscoElement("Unknown","Unknown","Unknown",ip)
-        elems[ip]=root
-        toVisit.append(ip)
-        visit()
-        if(len(elems)==1):
-            print('Probably not a Cisco device, trying with an Extreme')
-            elems={}
-            root=ExtremeElement("Unknown","Unknown","Unknown",ip)
+if __name__ == "__main__":
+    if len(sys.argv)>1:
+        if len(sys.argv)==2 and sys.argv[1]=="-a":
+            sniff(180)
+        elif len(sys.argv)==3 and sys.argv[1]=="-a" and sys.argv[2].isdigit():
+            sniff(int(sys.argv[2]))
+        elif len(sys.argv)==3 and sys.argv[1]=="-m" and valid_ip(sys.argv[2]):
+            ip=sys.argv[2]
+            root=CiscoElement("Unknown","Unknown","Unknown",ip)
             elems[ip]=root
             toVisit.append(ip)
             visit()
+            if(len(elems)==1):
+                print('Probably not a Cisco device, trying with an Extreme')
+                elems={}
+                root=ExtremeElement("Unknown","Unknown","Unknown",ip)
+                elems[ip]=root
+                toVisit.append(ip)
+                visit()
+        else:
+            print("usage:  naspy.py -a [timeout] for automatic sniff of cdp/lldp packet (180s default)\n\tnaspy.py -m IP for manual search")
     else:
-        print("usage: naspy.py -a [timeout] for automatic sniff of cdp packet (180s default)\nnaspy.py -m ip for manual search")
-else:
-    print("usage: naspy.py -a [timeout] for automatic sniff of cdp packet (180s default)\nnaspy.py -m ip for manual search")
+        print("usage:  naspy.py -a [timeout] for automatic sniff of cdp/lldp packet (180s default)\n\tnaspy.py -m IP for manual search")
 

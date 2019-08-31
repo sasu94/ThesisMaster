@@ -1,26 +1,66 @@
 import smtplib
+import json
 from email.mime.multipart import  MIMEMultipart
 from email.mime.text import MIMEText
 
 
 class LogSender:
+    """
+    A class useful to send email address with or without attachments
+    ----------
+    user : str
+        The email address used to send mail 
+    password : str
+        The password of the account
+    server_address : str
+        The address of the server SMTP
+    server_port : int
+        The port on which the server is listening
+    Methods
+    -------
+    send(addresses, body, subject, attachment, att_type, fname)
+        A method that sends an email with the possibility to add an attachment taken from a string or a file
+    """
 
     def __init__(self):
         self.user = 'naspy19@gmail.com'
         with open('email.naspy', 'r') as credentials:
-            self.password = credentials.readline()
+            data = json.loads(credentials.read())
+        self.password=data["password"]
+        self.addresses=data["addresses"]
         self.server_address = 'smtp.gmail.com'
         self.server_port = 465
 
-    def send(self, addressees, body, subject, attachment=None, att_type=None, fname='attachment'):
+    def send(self, body, subject, addresses=None, attachment=None, att_type=None, fname='attachment'):
+        """
+        A method that sends an email with the possibility to add an attachment taken from a string or a file
+        
+        Parameters
+        ----------
+        body:str
+            The body of the mail
+        subject:str
+            The subject of the mail
+        addresses:list(str)
+            The list of addresses to check
+        attachment:list(str)
+            A facultative field used to pass an attachment as string or a series of attachments
+        att_type:list(str)
+            A facultative field used to discriminate the nature of the attachments. It could be a string or a list of string
+        fname:list(str)
+            The name to give at the attachment(s). In case it is not passed it takes the name attachment
+        """
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = self.user
-
-        if isinstance(addressees, str):
-            msg['To'] = addressees
+        
+        if addresses==None:
+            addresses=self.addresses
+        
+        if isinstance(addresses, str):
+            msg['To'] = addresses
         else:
-            msg['To'] = ', '.join(addressees)
+            msg['To'] = ', '.join(addresses)
 
         content = MIMEText(body, 'plain')
         msg.attach(content)
@@ -64,7 +104,7 @@ class LogSender:
                     filename = '%s.json' % fname
                 else:
                     print('Error, attachment must be text, json or filename')
-                    return
+                    return False
 
                 payload.add_header('Content-Disposition', 'attachment', filename=filename)
                 msg.attach(payload)
@@ -73,8 +113,9 @@ class LogSender:
             server = smtplib.SMTP_SSL(self.server_address, self.server_port)
             server.ehlo()
             server.login(self.user, self.password)
-            server.sendmail(self.user, addressees, msg.as_string())
-            server.close()
-            print('Email Sent!')
+            server.sendmail(self.user, addresses, msg.as_string())
+            return True
         except Exception as e:
-            print('Something went wrong... %s' % e)
+            return False
+        finally:
+            server.close()
