@@ -1,6 +1,6 @@
 import smtplib
 import json
-from email.mime.multipart import  MIMEMultipart
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
@@ -9,7 +9,7 @@ class LogSender:
     A class useful to send email address with or without attachments
     ----------
     user : str
-        The email address used to send mail 
+        The email address used to send mail
     password : str
         The password of the account
     server_address : str
@@ -26,15 +26,15 @@ class LogSender:
         self.user = 'naspy19@gmail.com'
         with open('email.naspy', 'r') as credentials:
             data = json.loads(credentials.read())
-        self.password=data["password"]
-        self.addresses=data["addresses"]
+        self.password = data["password"]
+        self.addresses = data["addresses"]
         self.server_address = 'smtp.gmail.com'
         self.server_port = 465
 
     def send(self, body, subject, addresses=None, attachment=None, att_type=None, fname='attachment'):
         """
         A method that sends an email with the possibility to add an attachment taken from a string or a file
-        
+
         Parameters
         ----------
         body:str
@@ -53,10 +53,10 @@ class LogSender:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = self.user
-        
-        if addresses==None:
-            addresses=self.addresses
-        
+
+        if addresses == None:
+            addresses = self.addresses
+
         if isinstance(addresses, str):
             msg['To'] = addresses
         else:
@@ -66,7 +66,7 @@ class LogSender:
         msg.attach(content)
 
         if attachment is not None:
-            if type(attachment)==list:
+            if type(attachment) == list:
                 for i in range(len(attachment)):
                     if att_type[i] is None:
                         att_type[i] = 'filename'
@@ -87,8 +87,8 @@ class LogSender:
 
                     payload.add_header('Content-Disposition', 'attachment', filename=filename)
                     msg.attach(payload)
-            else:       
-                    
+            else:
+
                 if att_type is None:
                     att_type = 'filename'
 
@@ -109,13 +109,20 @@ class LogSender:
                 payload.add_header('Content-Disposition', 'attachment', filename=filename)
                 msg.attach(payload)
 
-        try:
-            server = smtplib.SMTP_SSL(self.server_address, self.server_port)
-            server.ehlo()
-            server.login(self.user, self.password)
-            server.sendmail(self.user, addresses, msg.as_string())
-            return True
-        except Exception as e:
-            return False
-        finally:
-            server.close()
+        num_attempt = 0
+        while num_attempt < 10:
+            try:
+                server = smtplib.SMTP_SSL(self.server_address, self.server_port)
+                server.ehlo()
+                server.login(self.user, self.password)
+                server.sendmail(self.user, addresses, msg.as_string())
+                return True
+            except Exception:
+                if num_attempt >= 10:
+                    print('Something went wrong...')
+                    return False
+                num_attempt += 1
+                print('Error, retrying')
+            finally:
+                server.close()
+

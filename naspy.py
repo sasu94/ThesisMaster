@@ -956,7 +956,7 @@ def constructJSON():
     logSender=LogSender()
     
     if logSender.send('Scan finished!','Results',attachment=["\n".join(nF),diffFile],att_type=['json','json'],fname=['data','diff']):
-        print("\nThe result had been sent via mail!")
+        print("\nThe results had been sent via mail!")
     else:
         print("\nAn error occured while sending the mail!")
     
